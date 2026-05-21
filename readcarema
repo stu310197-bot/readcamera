@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>跑班課 QR Code 掃描器</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #f4f4f9; margin: 0; padding: 20px; }
+        #reader { width: 100%; max-width: 500px; margin: auto; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        #result { margin-top: 20px; font-weight: bold; color: #004a8d; word-break: break-all; padding: 10px; }
+        .status { padding: 10px; margin: 10px auto; width: 80%; border-radius: 5px; display: none; }
+        .success { background: #d4edda; color: #155724; display: block; }
+        .error { background: #f8d7da; color: #721c24; display: block; }
+    </style>
+</head>
+<body>
+    <h2>📸 學生簽到掃描器</h2>
+    <div id="reader"></div>
+    <div id="status-box" class="status"></div>
+    <div id="result">準備就緒，請對準 QR Code</div>
+
+    <script>
+        // --- 設定區 ---
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyPOtyUwtuRqHqOfmDbKl0oAtUqWMryjrKq9g3EQ1fhxdn2CFu7PKljvi0qJltILOH3Kg/exec"; // 貼上您的 GAS 部署網址
+
+        const html5QrCode = new Html5Qrcode("reader");
+        const statusBox = document.getElementById("status-box");
+        const resultDiv = document.getElementById("result");
+
+        const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+            // 掃描成功，先停止掃描避免重複發送
+            html5QrCode.stop().then(() => {
+                resultDiv.innerText = "掃描成功！正在上傳資料...";
+                sendToGAS(decodedText);
+            });
+        };
+
+        function sendToGAS(content) {
+            fetch(WEB_APP_URL, {
+                method: "POST",
+                mode: "no-cors", // GAS API 通常需要設定 no-cors
+                cache: "no-cache",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ qrContent: content })
+            })
+            .then(() => {
+                showStatus("✅ 簽到資料已回傳！", "success");
+                resultDiv.innerText = "內容: " + content;
+                // 3秒後自動重啟掃描
+                setTimeout(startScanner, 3000);
+            })
+            .catch(err => {
+                showStatus("❌ 上傳失敗: " + err, "error");
+                setTimeout(startScanner, 3000);
+            });
+        }
+
+        function showStatus(msg, type) {
+            statusBox.innerText = msg;
+            statusBox.className = "status " + type;
+        }
+
+        function startScanner() {
+            statusBox.style.display = "none";
+            resultDiv.innerText = "準備就緒，請對準 QR Code";
+            html5QrCode.start(
+                { facingMode: "environment" }, // 使用後鏡頭
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                qrCodeSuccessCallback
+            );
+        }
+
+        startScanner();
+    </script>
+</body>
+</html>
